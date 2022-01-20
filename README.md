@@ -1,3 +1,5 @@
+## This branch is not going to be updated but I'm keeping it around because I don't like removing things permanently
+
 # SpecialItemsLib
 
 A [NeosModLoader](https://github.com/zkxs/NeosModLoader) mod for [Neos VR](https://neos.com/) that is a library which allows other mods to easily add custom special items to be shown in the inventory.
