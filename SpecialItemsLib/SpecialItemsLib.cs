@@ -14,8 +14,8 @@ namespace SpecialItemsLib
     public class CustomSpecialItem
     {
         // TODO: get this json ignore thing to actually work
-        [JsonIgnore]
-        public InventoryBrowser.SpecialItemType ItemType;
+        [Newtonsoft.Json.JsonIgnore]
+        public InventoryBrowser.SpecialItemType ItemType { get; set; }
         public Uri Uri;
 
         public CustomSpecialItem(int type)
@@ -222,7 +222,6 @@ namespace SpecialItemsLib
                             item.Value.Uri = url;
                             config.Set(CUSTOM_ITEMS_KEY, dict);
                             ReprocessItems();
-                            config.Save();
                         };
                         break;
                     }
