@@ -13,53 +13,15 @@ namespace SpecialItemsLib
 {
     public class CustomSpecialItem
     {
+        // TODO: get this json ignore thing to actually work
+        [JsonIgnore]
         public InventoryBrowser.SpecialItemType ItemType;
-        public string Tag;
-        public string Variable;
-        private Uri _uri;
-        public Uri Uri
-        {
-            get
-            {
-                return _uri;
-            }
-            set
-            {
-                if (!SpecialItemsLib.config.GetValue(SpecialItemsLib.USE_CLOUD_KEY) || Variable == null)
-                {
-                    _uri = value;
-                    return;
-                }
-                if (_uri != value)
-                {
-                    if (Engine.Current.Cloud.CurrentUser == null && value != null)
-                    {
-                        throw new InvalidOperationException($"Cannot set special item {ItemType} URL without being signed in");
-                    }
-                    _uri = value;
-                    if (Engine.Current.Cloud.CurrentUser != null)
-                    {
-                        Engine.Current.Cloud.WriteVariable(Variable, value);
-                    }
-                    SpecialItemsLib.RefreshItems();
-                }
-            }
-        }
+        public Uri Uri;
 
-        public CustomSpecialItem(int type, string tag)
+        public CustomSpecialItem(int type)
         {
             ItemType = (InventoryBrowser.SpecialItemType)type;
-            Tag = tag;
-            Variable = null;
-            _uri = null;
-        }
-
-        public CustomSpecialItem(int type, string tag, string var)
-        {
-            ItemType = (InventoryBrowser.SpecialItemType)type;
-            Tag = tag;
-            Variable = var;
-            _uri = null;
+            Uri = null;
         }
     }
 
@@ -70,13 +32,18 @@ namespace SpecialItemsLib
         public override string Version => "1.0.0";
         public override string Link => "https://github.com/art0007i/SpecialItemsLib/";
 
-        public static readonly ModConfigurationKey<bool> USE_CLOUD_KEY = new ModConfigurationKey<bool>("use_cloud", "Wether to use cloud variables to store special items (when available)", () => false);
         public static ModConfiguration config;
 
-        public override ModConfigurationDefinition GetConfigurationDefinition()
+        [AutoRegisterConfigKey]
+        private static readonly ModConfigurationKey<Dictionary<string, CustomSpecialItem>> CUSTOM_ITEMS_KEY = new ModConfigurationKey<Dictionary<string, CustomSpecialItem>>
+                                                                                                            ("custom_items", "Stores the urls of custom special items", 
+                                                                                                            () => { return new Dictionary<string, CustomSpecialItem>(); });
+
+        public override void DefineConfiguration(ModConfigurationDefinitionBuilder builder)
         {
-            var keys = new List<ModConfigurationKey> { USE_CLOUD_KEY };
-            return DefineConfiguration(new Version(1, 0, 0), keys);
+            builder
+                .AutoSave(true)
+                .Version(new Version(1, 0, 0));
         }
 
         public override void OnEngineInit()
@@ -87,7 +54,9 @@ namespace SpecialItemsLib
         }
 
         private static int CurrentSpecialItem = 20;
-        private static readonly List<CustomSpecialItem> CustomItems = new List<CustomSpecialItem>();
+
+        public static Dictionary<string, CustomSpecialItem> CustomItems { get { return config.GetValue(CUSTOM_ITEMS_KEY); } }
+
         private static readonly List<InventoryBrowser> ActiveBrowsers = new List<InventoryBrowser>();
 
         public static void RefreshItems()
@@ -104,41 +73,59 @@ namespace SpecialItemsLib
             }
         }
 
-        public static CustomSpecialItem RegisterItem(string item_tag) => RegisterItem(item_tag, null);
-        public static CustomSpecialItem RegisterItem(string item_tag, string variable_name)
-        {
-            var item = new CustomSpecialItem(CurrentSpecialItem++, item_tag, variable_name);
-            CustomItems.Add(item);
-            Msg($"adding new item {item_tag} with var name {variable_name} and special item id {CurrentSpecialItem}");
-            Msg("Special items count " + CustomItems.Count);
-            return item;
-        }
 
-        [HarmonyPatch(typeof(ProfileManager), "SignIn")]
-        // Loads custom item urls from cloud
-        class ProfileManager_SignIn_Patch
+        public static CustomSpecialItem RegisterItem(string item_tag)
         {
-            public static async void Prefix(ProfileManager __instance)
+            if (config == null)
+            foreach(var mod in ModLoader.Mods())
             {
-                foreach (var item in CustomItems)
+                if(mod.GetType() == typeof(SpecialItemsLib))
                 {
-                    if(item.Variable != null && config.GetValue(USE_CLOUD_KEY))
-                    {
-                        var cloudResult = await __instance.Cloud.ReadVariable<Uri>(item.Variable);
-                        if (cloudResult.IsOK)
-                        {
-                            item.Uri = cloudResult.Entity;
-                        }
-                    }
+                    config = mod.GetConfiguration();
                 }
             }
+            CustomSpecialItem item;
+            var dict = CustomItems;
+            if (dict.TryGetValue(item_tag, out item))
+            {
+                item.ItemType = (InventoryBrowser.SpecialItemType)CurrentSpecialItem++;
+            }
+            else
+            {
+                item = new CustomSpecialItem(CurrentSpecialItem++);
+                dict.Add(item_tag, item);
+            }
+            config.Set(CUSTOM_ITEMS_KEY, dict);
+            Debug($"adding new item {item_tag} and special item id {CurrentSpecialItem-1}");
+            Debug("Special items count " + CustomItems.Count);
+            return item;
         }
 
         [HarmonyPatch(typeof(InventoryBrowser))]
         // Pink item background updating in inventory
         class InventoryBrowser_ChangeEvents_Patch
         {
+            [HarmonyPostfix]
+            [HarmonyPatch("ProcessItem")]
+            public static void PostProcess(InventoryItemUI item)
+            {
+                Record record = (Record)AccessTools.Field(item.GetType(), "Item").GetValue(item);
+                if (record == null) return;
+                Uri uri = record.URL;
+                InventoryBrowser.SpecialItemType specialItemType = InventoryBrowser.ClassifyItem(item);
+                foreach (var customItem in CustomItems)
+                {
+                    if(customItem.Value.ItemType == 0) continue;
+                    if (uri != null && specialItemType == customItem.Value.ItemType && uri == customItem.Value.Uri)
+                    {
+                        item.NormalColor.Value = InventoryBrowser.ACTIVE_AVATAR_COLOR;
+                        item.SelectedColor.Value = InventoryBrowser.ACTIVE_AVATAR_COLOR.MulA(2f);
+                        return;
+                    }
+                }
+            }
 
+            // Keep track of active inventory browsers to refresh them when you click the pink button
             [HarmonyPostfix]
             [HarmonyPatch("OnAwake")]
             public static void PostAwake(InventoryBrowser __instance)
@@ -153,25 +140,20 @@ namespace SpecialItemsLib
             {
                 ActiveBrowsers.Remove(__instance);
             }
+        }
 
-            [HarmonyPostfix]
-            [HarmonyPatch("ProcessItem")]
-            public static void PostProcess(InventoryItemUI item)
+        private static void ReprocessItems()
+        {
+            ActiveBrowsers.ForEach(browser =>
             {
-                Record record = (Record)AccessTools.Field(item.GetType(), "Item").GetValue(item);
-                if (record == null) return;
-                Uri uri = record.URL;
-                InventoryBrowser.SpecialItemType specialItemType = InventoryBrowser.ClassifyItem(item);
-                foreach(var customItem in CustomItems)
+                if (browser.CanInteract(browser.LocalUser))
                 {
-                    if (uri != null && specialItemType == customItem.ItemType && uri == customItem.Uri)
+                    browser.RunSynchronously(() =>
                     {
-                        item.NormalColor.Value = InventoryBrowser.ACTIVE_AVATAR_COLOR;
-                        item.SelectedColor.Value = InventoryBrowser.ACTIVE_AVATAR_COLOR.MulA(2f);
-                        return;
-                    }
+                        AccessTools.Method(typeof(InventoryBrowser), "ReprocessItems").Invoke(browser, null);
+                    });
                 }
-            }
+            });
         }
 
         // This allows identifying which items in the inventory are custom
@@ -187,9 +169,10 @@ namespace SpecialItemsLib
                     {
                         foreach(var item in CustomItems)
                         {
-                            if (record.Tags.Contains(item.Tag))
+                            if (item.Value.ItemType == 0) continue;
+                            if (record.Tags.Contains(item.Key))
                             {
-                                __result = item.ItemType;
+                                __result = item.Value.ItemType;
                             }
                         }
                     }
@@ -204,7 +187,6 @@ namespace SpecialItemsLib
             public static void Prefix(InventoryBrowser __instance, out InventoryBrowser.SpecialItemType __state)
             {
                 __state = (AccessTools.Field(typeof(InventoryBrowser), "_lastSpecialItemType").GetValue(__instance) as Sync<InventoryBrowser.SpecialItemType>).Value;
-                Msg("State is " + __state);
             }
 
             public static void Postfix(InventoryBrowser __instance, BrowserItem currentItem, InventoryBrowser.SpecialItemType __state)
@@ -212,13 +194,15 @@ namespace SpecialItemsLib
                 InventoryItemUI inventoryItemUI = currentItem as InventoryItemUI;
                 InventoryBrowser.SpecialItemType specialItemType = InventoryBrowser.ClassifyItem(inventoryItemUI);
                 var buttonsRoot = (AccessTools.Field(typeof(InventoryBrowser), "_buttonsRoot").GetValue(__instance) as SyncRef<Slot>).Target[0];
-                Msg("Classified item is " + specialItemType);
+                Debug("Classified item is " + specialItemType);
                 if (__state == specialItemType) return;
-                Msg(CustomItems.Count);
-                foreach(var item in CustomItems)
+                var dict = CustomItems;
+                Debug(dict.Count);
+                foreach(var item in dict)
                 {
-                    Msg("checking against " + item.ItemType);
-                    if (specialItemType == item.ItemType)
+                    Debug("checking against " + item.Value.ItemType);
+                    if (item.Value.ItemType == 0) continue;
+                    if (specialItemType == item.Value.ItemType)
                     {
                         var uibuilder = new FrooxEngine.UIX.UIBuilder(buttonsRoot);
                         uibuilder.Style.PreferredWidth = BrowserDialog.DEFAULT_ITEM_SIZE * 0.6f;
@@ -231,11 +215,14 @@ namespace SpecialItemsLib
                         but.Slot.OrderOffset = -1;
                         but.LocalPressed += (IButton button, ButtonEventData data) => {
                             Uri url = (AccessTools.Field(typeof(InventoryItemUI), "Item").GetValue(__instance.SelectedInventoryItem) as Record).URL;
-                            if (item.Uri == url)
+                            if (item.Value.Uri == url)
                             {
                                 url = null;
                             }
-                            item.Uri = url;
+                            item.Value.Uri = url;
+                            config.Set(CUSTOM_ITEMS_KEY, dict);
+                            ReprocessItems();
+                            config.Save();
                         };
                         break;
                     }
