@@ -29,7 +29,7 @@ namespace SpecialItemsLib
     {
         public override string Name => "SpecialItemsLib";
         public override string Author => "art0007i";
-        public override string Version => "1.0.0";
+        public override string Version => "1.1.0";
         public override string Link => "https://github.com/art0007i/SpecialItemsLib/";
 
         public static ModConfiguration config;
@@ -162,6 +162,8 @@ namespace SpecialItemsLib
         {
             public static void Postfix(InventoryItemUI itemui, ref InventoryBrowser.SpecialItemType __result)
             {
+                // For people who have videos on their avatar
+                if (__result != InventoryBrowser.SpecialItemType.None) return;
                 if (itemui != null)
                 {
                     Record record = (Record)AccessTools.Field(itemui.GetType(), "Item").GetValue(itemui);
