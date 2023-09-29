@@ -33,7 +33,7 @@ namespace SpecialItemsLib
     {
         public override string Name => "SpecialItemsLib";
         public override string Author => "art0007i";
-        public override string Version => "2.0.0";
+        public override string Version => "2.0.1";
         public override string Link => "https://github.com/art0007i/SpecialItemsLib/";
 
         public static ModConfiguration config;
@@ -100,6 +100,7 @@ namespace SpecialItemsLib
             if (dict.TryGetValue(item_tag, out item))
             {
                 item.ItemType = (InventoryBrowser.SpecialItemType)CurrentSpecialItem++;
+                item.ReadableName = readable_name;
             }
             else
             {
