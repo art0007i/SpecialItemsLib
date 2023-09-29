@@ -1,13 +1,14 @@
 using HarmonyLib;
-using NeosModLoader;
+using ResoniteModLoader;
 using System;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using FrooxEngine;
-using BaseX;
+using Elements.Core;
 using Newtonsoft.Json;
+using FrooxEngine.UIX;
 
 namespace SpecialItemsLib
 {
@@ -16,20 +17,23 @@ namespace SpecialItemsLib
         // TODO: get this json ignore thing to actually work
         [Newtonsoft.Json.JsonIgnore]
         public InventoryBrowser.SpecialItemType ItemType { get; set; }
+        [Newtonsoft.Json.JsonIgnore]
+        public string ReadableName { get; set; }
         public Uri Uri;
 
-        public CustomSpecialItem(int type)
+        public CustomSpecialItem(int type, string readableName)
         {
+            ReadableName = readableName;
             ItemType = (InventoryBrowser.SpecialItemType)type;
             Uri = null;
         }
     }
 
-    public class SpecialItemsLib : NeosMod
+    public class SpecialItemsLib : ResoniteMod
     {
         public override string Name => "SpecialItemsLib";
         public override string Author => "art0007i";
-        public override string Version => "1.1.0";
+        public override string Version => "2.0.0";
         public override string Link => "https://github.com/art0007i/SpecialItemsLib/";
 
         public static ModConfiguration config;
@@ -74,7 +78,14 @@ namespace SpecialItemsLib
         }
 
 
-        public static CustomSpecialItem RegisterItem(string item_tag)
+        /// <summary>
+        /// Registers an item to allow it to be favoritable.
+        /// The readable name will be shown to users in this format "Set {0}"
+        /// </summary>
+        /// <param name="item_tag">The tag that items will require to be favoritable</param>
+        /// <param name="readable_name">The readable name will be shown to users in this format "Set {0}"</param>
+        /// <returns></returns>
+        public static CustomSpecialItem RegisterItem(string item_tag, string readable_name)
         {
             if (config == null)
             foreach(var mod in ModLoader.Mods())
@@ -92,7 +103,7 @@ namespace SpecialItemsLib
             }
             else
             {
-                item = new CustomSpecialItem(CurrentSpecialItem++);
+                item = new CustomSpecialItem(CurrentSpecialItem++, readable_name);
                 dict.Add(item_tag, item);
             }
             config.Set(CUSTOM_ITEMS_KEY, dict);
@@ -111,15 +122,15 @@ namespace SpecialItemsLib
             {
                 Record record = (Record)AccessTools.Field(item.GetType(), "Item").GetValue(item);
                 if (record == null) return;
-                Uri uri = record.URL;
+                Uri uri = record.GetUrl(item.Cloud.Platform);
                 InventoryBrowser.SpecialItemType specialItemType = InventoryBrowser.ClassifyItem(item);
                 foreach (var customItem in CustomItems)
                 {
                     if(customItem.Value.ItemType == 0) continue;
                     if (uri != null && specialItemType == customItem.Value.ItemType && uri == customItem.Value.Uri)
                     {
-                        item.NormalColor.Value = InventoryBrowser.ACTIVE_AVATAR_COLOR;
-                        item.SelectedColor.Value = InventoryBrowser.ACTIVE_AVATAR_COLOR.MulA(2f);
+                        item.NormalColor.Value = InventoryBrowser.FAVORITE_COLOR;
+                        item.SelectedColor.Value = InventoryBrowser.FAVORITE_COLOR.MulA(2f);
                         return;
                     }
                 }
@@ -207,16 +218,17 @@ namespace SpecialItemsLib
                     if (specialItemType == item.Value.ItemType)
                     {
                         var uibuilder = new FrooxEngine.UIX.UIBuilder(buttonsRoot);
-                        uibuilder.Style.PreferredWidth = BrowserDialog.DEFAULT_ITEM_SIZE * 0.6f;
+                        uibuilder.Style.PreferredWidth = BrowserDialog.DEFAULT_ITEM_SIZE * 3;
+                        RadiantUI_Constants.SetupDefaultStyle(uibuilder);
 
                         //MixColor method, since its a one liner i would rather just copy source than reflection to get it
-                        var pink = MathX.Lerp(color.Purple, color.White, 0.5f);
+                        var pink = MathX.Lerp(colorX.Purple, colorX.White, 0.5f);
 
-                        var but = uibuilder.Button(NeosAssets.Common.Icons.Heart, pink, color.Black);
+                        var but = uibuilder.Button(OfficialAssets.Graphics.Icons.Inspector.Pin, $"Set {item.Value.ReadableName}");
 
                         but.Slot.OrderOffset = -1;
                         but.LocalPressed += (IButton button, ButtonEventData data) => {
-                            Uri url = (AccessTools.Field(typeof(InventoryItemUI), "Item").GetValue(__instance.SelectedInventoryItem) as Record).URL;
+                            Uri url = (AccessTools.Field(typeof(InventoryItemUI), "Item").GetValue(__instance.SelectedInventoryItem) as Record).GetUrl(but.Cloud.Platform);
                             if (item.Value.Uri == url)
                             {
                                 url = null;
