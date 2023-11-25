@@ -2,13 +2,10 @@ using HarmonyLib;
 using ResoniteModLoader;
 using System;
 using System.Linq;
-using System.Reflection;
-using System.Threading.Tasks;
+using FrooxEngine.Store;
 using System.Collections.Generic;
 using FrooxEngine;
 using Elements.Core;
-using Newtonsoft.Json;
-using FrooxEngine.UIX;
 
 namespace SpecialItemsLib
 {
@@ -33,7 +30,7 @@ namespace SpecialItemsLib
     {
         public override string Name => "SpecialItemsLib";
         public override string Author => "art0007i";
-        public override string Version => "2.0.1";
+        public override string Version => "2.0.2";
         public override string Link => "https://github.com/art0007i/SpecialItemsLib/";
 
         public static ModConfiguration config;

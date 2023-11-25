@@ -33,6 +33,9 @@
     <Reference Include="FrooxEngine">
       <HintPath>$(GamePath)Resonite_Data\Managed\FrooxEngine.dll</HintPath>
     </Reference>
+    <Reference Include="FrooxEngine.Store">
+      <HintPath>$(GamePath)Resonite_Data\Managed\FrooxEngine.Store.dll</HintPath>
+    </Reference>
     <Reference Include="ResoniteModLoader">
       <HintPath>$(GamePath)ResoniteModLoader.dll</HintPath>
       <HintPath>$(GamePath)Libraries\ResoniteModLoader.dll</HintPath>
