@@ -43,6 +43,9 @@
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(GamePath)Resonite_Data\Managed\Newtonsoft.Json.dll</HintPath>
     </Reference>
+    <Reference Include="SkyFrost.Base.Models">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Resonite\Resonite_Data\Managed\SkyFrost.Base.Models.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(CopyToMods)'=='true'">
