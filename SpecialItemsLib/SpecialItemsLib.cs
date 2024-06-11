@@ -30,7 +30,7 @@ namespace SpecialItemsLib
     {
         public override string Name => "SpecialItemsLib";
         public override string Author => "art0007i";
-        public override string Version => "2.0.2";
+        public override string Version => "2.0.3";
         public override string Link => "https://github.com/art0007i/SpecialItemsLib/";
 
         public static ModConfiguration config;
